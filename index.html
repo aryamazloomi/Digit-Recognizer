@@ -197,21 +197,30 @@
     // ------------------------------
     let model = null;
     const modelUrlInput = document.getElementById('modelUrl');
-    modelUrlInput.value = '/Models/model.json';
+    modelUrlInput.value = 'Models/model.json';
     const modelBadge = document.getElementById('modelBadge');
 
-    async function loadModel(){
+     async function loadModel(){
       const url = modelUrlInput.value.trim();
       try{
         setBadge('loading','Loading…');
         model = await tf.loadLayersModel(url);
-        // warm up (expects [1,28,28,1])
-        tf.tidy(()=> model.predict(tf.zeros([1,28,28,1])));
+    
+        // Detect input: [null, 784] => flat, [null,28,28,1] => image
+        const s = model.inputs[0].shape;
+        expectedInput = (s.length === 2 && s[1] === 784) ? 'flat' : 'image';
+    
+        // Warm up with the right shape
+        tf.tidy(() => {
+          if (expectedInput === 'flat') model.predict(tf.zeros([1, 784]));
+          else                          model.predict(tf.zeros([1, 28, 28, 1]));
+        });
+    
         setBadge('loaded','Loaded');
       }catch(err){
         console.error(err);
         setBadge('err','Failed');
-        alert('Failed to load model: '+err.message);
+        alert('Failed to load model: ' + err.message);
       }
     }
 
@@ -230,32 +239,31 @@
     // ------------------------------
     // Preprocess & Predict
     // ------------------------------
-    function preprocess(toSize=28){
-      // 1) Downscale keeping content to 28x28
-      const t = document.createElement('canvas'); t.width = toSize; t.height = toSize; const tctx=t.getContext('2d');
-      // Optional: simple bounding-box crop to tighten around strokes
-      const src = ctx.getImageData(0,0,pad.width,pad.height);
-      const box = boundingBox(src.data, pad.width, pad.height, 10); // 10px margin
-      // draw cropped region scaled into t
-      tctx.fillStyle = '#000'; tctx.fillRect(0,0,toSize,toSize);
-      if(box.w>0 && box.h>0){
-        tctx.drawImage(pad, box.x, box.y, box.w, box.h, 0, 0, toSize, toSize);
-      }else{
-        tctx.drawImage(pad, 0, 0, pad.width, pad.height, 0, 0, toSize, toSize);
-      }
-
-      // 2) Get image data and convert to 0-1 grayscale
-      const id = tctx.getImageData(0,0,toSize,toSize); const d=id.data; const invert = document.getElementById('invertChk').checked;
-      const out = new Float32Array(toSize*toSize);
-      for(let i=0,j=0;i<d.length;i+=4,j++){
-        const r=d[i],g=d[i+1],b=d[i+2];
-        let gray = (0.299*r + 0.587*g + 0.114*b)/255; // 0..1
-        gray = invert ? gray : 1-gray; // If not inverting at load time, invert here for black-on-white inputs
-        out[j] = gray;
-      }
-      // 3) Create tensor [1,28,28,1]
-      return tf.tensor(out, [1,toSize,toSize,1]);
+   function preprocess(toSize=28){
+    // downscale & crop (same as before)
+    const t = document.createElement('canvas'); t.width = toSize; t.height = toSize;
+    const tctx = t.getContext('2d');
+    const src = ctx.getImageData(0,0,pad.width,pad.height);
+    const box = boundingBox(src.data, pad.width, pad.height, 10);
+    tctx.fillStyle = '#000'; tctx.fillRect(0,0,toSize,toSize);
+    if(box.w>0 && box.h>0) tctx.drawImage(pad, box.x, box.y, box.w, box.h, 0, 0, toSize, toSize);
+    else                   tctx.drawImage(pad, 0, 0, pad.width, pad.height, 0, 0, toSize, toSize);
+  
+    // grayscale 0..1 (respect the Invert toggle)
+    const id = tctx.getImageData(0,0,toSize,toSize), d = id.data;
+    const invert = document.getElementById('invertChk').checked;
+    const out = new Float32Array(toSize*toSize);
+    for(let i=0,j=0;i<d.length;i+=4,j++){
+      const r=d[i], g=d[i+1], b=d[i+2];
+      let gray = (0.299*r + 0.587*g + 0.114*b)/255;
+      gray = invert ? gray : 1-gray;
+      out[j] = gray;
     }
+  
+    return (expectedInput === 'flat')
+      ? tf.tensor(out, [1, toSize*toSize])      // [1,784]
+      : tf.tensor(out, [1, toSize, toSize, 1]); // [1,28,28,1]
+  }
 
     function boundingBox(data,w,h,margin=6){
       const threshold = 10; // anything brighter than this considered ink due to dark bg
