@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Digit Recognizer • TensorFlow.js</title>
+  <meta name="description" content="Draw or upload a digit and get a prediction from a TensorFlow.js CNN model." />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+  <style>
+    :root{
+      --bg:#0b0d10;--panel:#12161b;--muted:#7b8794;--text:#e6edf3;--accent:#6ee7b7;--accent-2:#93c5fd;--danger:#fda4af;
+      --border:rgba(255,255,255,.08)
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(180deg,#0a0c10 0%,#0b0d10 30%,#101318 100%);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,"Helvetica Neue",Arial}
+    .wrap{max-width:1100px;margin:0 auto;padding:28px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+    .title{display:flex;align-items:center;gap:12px}
+    .title .dot{width:10px;height:10px;border-radius:999px;background:var(--accent);box-shadow:0 0 24px var(--accent)}
+    h1{margin:0;font-size:clamp(20px,2.6vw,28px);letter-spacing:.2px}
+    .card{background:linear-gradient(180deg,#12161b 0%,#0f141a 100%);border:1px solid var(--border);border-radius:18px;box-shadow:0 10px 35px rgba(0,0,0,.35);overflow:hidden}
+    .grid{display:grid;grid-template-columns:380px 1fr;gap:18px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    .left{padding:18px}
+    .tools{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 14px}
+    button,.btn{appearance:none;border:1px solid var(--border);background:#141a21;color:var(--text);padding:10px 14px;border-radius:12px;cursor:pointer;transition:.15s transform,.15s background,.15s border-color;font-weight:600}
+    button:hover{transform:translateY(-1px);border-color:#223046}
+    button.primary{background:linear-gradient(180deg,#1b2837,#152030);border-color:#203049}
+    button.primary:hover{border-color:#2a4263}
+    .danger{border-color:rgba(255,255,255,.08);background:linear-gradient(180deg,#2a1116,#1a0b0e)}
+    .muted{color:var(--muted)}
+    .switch{display:flex;align-items:center;gap:8px}
+    .switch input{accent-color:var(--accent)}
+    .note{font-size:13px;color:var(--muted)}
+    .canvas-wrap{position:relative;display:grid;place-items:center;background:#0a0d12;border:1px dashed #223046;border-radius:16px;aspect-ratio:1/1}
+    canvas#pad{background:#0e1319;border-radius:14px;touch-action:none;image-rendering:pixelated}
+    .right{padding:18px;border-left:1px solid var(--border)}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .row input[type="text"]{flex:1;min-width:240px;background:#0f141a;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:12px}
+    .badge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
+    .badge .led{width:8px;height:8px;border-radius:999px;background:#555}
+    .badge.loaded .led{background:var(--accent)}
+    .badge.err .led{background:var(--danger)}
+    .prob{display:grid;grid-template-columns:24px 1fr 56px;gap:10px;align-items:center}
+    .bar{height:12px;background:#131a22;border:1px solid var(--border);border-radius:999px;position:relative;overflow:hidden}
+    .bar>i{position:absolute;inset:0 100% 0 0;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-right:1px solid rgba(255,255,255,.25)}
+    .pred{font-size:40px;font-weight:800;letter-spacing:1px}
+    .drop{border:1px dashed #2a3a53;border-radius:12px;padding:10px;text-align:center;cursor:pointer}
+    .footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
+    a {color:#93c5fd;text-decoration:none}
+    .kbd{background:#121820;border:1px solid var(--border);padding:2px 6px;border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="title">
+        <div class="dot" aria-hidden></div>
+        <h1>Digit Recognizer <span class="muted">(TensorFlow.js)</span></h1>
+      </div>
+      <div class="badge" id="modelBadge" title="Model status"><span class="led"></span> Model: not loaded</div>
+    </header>
+
+    <div class="card grid">
+      <!-- LEFT: Canvas & Controls -->
+      <section class="left">
+        <div class="row" style="margin-bottom:8px">
+          <button class="primary" id="predictBtn">Predict (<span class="kbd">P</span>)</button>
+          <button id="clearBtn">Clear (<span class="kbd">C</span>)</button>
+          <label class="switch"><input type="checkbox" id="invertChk" checked>Invert to MNIST-style</label>
+          <label class="switch"><input type="checkbox" id="smoothChk" checked>Smooth stroke</label>
+        </div>
+
+        <div class="canvas-wrap">
+          <canvas id="pad" width="280" height="280" aria-label="Drawing pad"></canvas>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <div class="drop" id="uploadArea" title="Drop a 0-9 digit image here (PNG/JPEG)">Drop an image here or <u>click to upload</u></div>
+          <input type="file" id="fileInput" accept="image/png,image/jpeg" hidden>
+        </div>
+
+        <p class="note">Tip: draw a thick, centered digit in white-on-dark (default). If your training used black-on-white, just toggle “Invert”. Supports mouse and touch. </p>
+      </section>
+
+      <!-- RIGHT: Model & Output -->
+      <section class="right">
+        <div class="row" style="margin-bottom:10px">
+          <input id="modelUrl" type="text" placeholder="/model/model.json (default)" />
+          <button id="loadBtn">Load model</button>
+        </div>
+        <p class="note">Place your exported TF.js model at <code>/model/model.json</code> (with shard files) in this repo, or paste any HTTPS URL above and click <b>Load model</b>.</p>
+
+        <div style="margin:14px 0 8px" class="muted">Prediction</div>
+        <div class="pred" id="predLabel">–</div>
+        <div id="probs" style="display:grid;gap:8px;margin-top:12px"></div>
+
+        <div class="footer">
+          <div class="note">Preprocess: resize→grayscale→normalize(0–1)→invert (optional)</div>
+          <a href="https://github.com/" target="_blank" rel="noopener">View on GitHub</a>
+        </div>
+      </section>
+    </div>
+
+    <p class="note" style="margin-top:14px">Keyboard: <span class="kbd">P</span> predict, <span class="kbd">C</span> clear.  Canvas: 280×280 → 28×28 for the model.  You can swap to 32×32 in code if your model expects it.</p>
+  </div>
+
+  <script>
+    // ------------------------------
+    // Drawing Pad
+    // ------------------------------
+    const pad = document.getElementById('pad');
+    const ctx = pad.getContext('2d', { willReadFrequently: true });
+    let drawing = false, last = null;
+
+    // Dark background + white brush by default (MNIST inverted)
+    function resetPad(){
+      ctx.save();
+      ctx.fillStyle = '#0e1319';
+      ctx.fillRect(0,0,pad.width,pad.height);
+      ctx.restore();
+    }
+    resetPad();
+
+    function setBrush(){
+      const smooth = document.getElementById('smoothChk').checked;
+      ctx.lineWidth = 26; // thick stroke helps downscale
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#ffffff';
+      ctx.filter = smooth ? 'blur(0.4px)' : 'none';
+    }
+
+    function pos(e){
+      const r = pad.getBoundingClientRect();
+      const x = (e.touches? e.touches[0].clientX : e.clientX) - r.left;
+      const y = (e.touches? e.touches[0].clientY : e.clientY) - r.top;
+      return {x:x*(pad.width/r.width), y:y*(pad.height/r.height)}
+    }
+
+    function start(e){ drawing = true; last = pos(e); setBrush(); }
+    function move(e){ if(!drawing) return; const p = pos(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; }
+    function end(){ drawing = false; last=null; }
+
+    pad.addEventListener('mousedown', start); pad.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+    pad.addEventListener('touchstart', e=>{e.preventDefault(); start(e)} ,{passive:false});
+    pad.addEventListener('touchmove',  e=>{e.preventDefault(); move(e)} ,{passive:false});
+    pad.addEventListener('touchend',   e=>{e.preventDefault(); end(e)}  ,{passive:false});
+
+    document.getElementById('clearBtn').onclick = ()=>{ resetPad(); setPrediction(null) };
+    document.addEventListener('keydown', (e)=>{
+      if(e.key.toLowerCase()==='c') document.getElementById('clearBtn').click();
+      if(e.key.toLowerCase()==='p') document.getElementById('predictBtn').click();
+    });
+
+    // ------------------------------
+    // Upload image to canvas
+    // ------------------------------
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+
+    uploadArea.addEventListener('click', ()=>fileInput.click());
+    uploadArea.addEventListener('dragover', e=>{ e.preventDefault(); uploadArea.style.background = 'rgba(147,197,253,.06)'; });
+    uploadArea.addEventListener('dragleave', ()=>{ uploadArea.style.background = 'transparent' });
+    uploadArea.addEventListener('drop', e=>{ e.preventDefault(); uploadArea.style.background = 'transparent'; handleFiles(e.dataTransfer.files) });
+    fileInput.addEventListener('change', ()=> handleFiles(fileInput.files));
+
+    function handleFiles(files){
+      if(!files || !files[0]) return;
+      const file = files[0];
+      const img = new Image();
+      img.onload = ()=>{
+        resetPad();
+        // Fit image into square canvas preserving aspect
+        const scale = Math.min(pad.width/img.width, pad.height/img.height);
+        const w = img.width*scale, h = img.height*scale;
+        const x = (pad.width-w)/2, y = (pad.height-h)/2;
+        const tmp = document.getElementById('invertChk').checked; // if invert checked, load as light on dark background
+        if(tmp){
+          // Convert to grayscale & invert by drawing onto temporary canvas then composite
+          const t = document.createElement('canvas'); t.width = w; t.height = h; const tctx=t.getContext('2d');
+          tctx.drawImage(img,0,0,w,h);
+          const id = tctx.getImageData(0,0,w,h); const d=id.data;
+          for(let i=0;i<d.length;i+=4){ const r=d[i],g=d[i+1],b=d[i+2]; const gray = (r*0.299+g*0.587+b*0.114); const inv = 255-gray; d[i]=d[i+1]=d[i+2]=inv; }
+          tctx.putImageData(id,0,0); ctx.drawImage(t,x,y);
+        }else{
+          ctx.drawImage(img,x,y,w,h);
+        }
+      }
+      img.src = URL.createObjectURL(file);
+    }
+
+    // ------------------------------
+    // Model Loading
+    // ------------------------------
+    let model = null;
+    const modelUrlInput = document.getElementById('modelUrl');
+    modelUrlInput.value = '/model/model.json';
+    const modelBadge = document.getElementById('modelBadge');
+
+    async function loadModel(){
+      const url = modelUrlInput.value.trim();
+      try{
+        setBadge('loading','Loading…');
+        model = await tf.loadLayersModel(url);
+        // warm up (expects [1,28,28,1])
+        tf.tidy(()=> model.predict(tf.zeros([1,28,28,1])));
+        setBadge('loaded','Loaded');
+      }catch(err){
+        console.error(err);
+        setBadge('err','Failed');
+        alert('Failed to load model: '+err.message);
+      }
+    }
+
+    function setBadge(state,text){
+      modelBadge.classList.remove('loaded','err');
+      if(state==='loaded') modelBadge.classList.add('loaded');
+      if(state==='err') modelBadge.classList.add('err');
+      modelBadge.lastChild.textContent = ' Model: ' + text;
+    }
+
+    document.getElementById('loadBtn').onclick = loadModel;
+
+    // Auto-load default path when the page opens
+    loadModel();
+
+    // ------------------------------
+    // Preprocess & Predict
+    // ------------------------------
+    function preprocess(toSize=28){
+      // 1) Downscale keeping content to 28x28
+      const t = document.createElement('canvas'); t.width = toSize; t.height = toSize; const tctx=t.getContext('2d');
+      // Optional: simple bounding-box crop to tighten around strokes
+      const src = ctx.getImageData(0,0,pad.width,pad.height);
+      const box = boundingBox(src.data, pad.width, pad.height, 10); // 10px margin
+      // draw cropped region scaled into t
+      tctx.fillStyle = '#000'; tctx.fillRect(0,0,toSize,toSize);
+      if(box.w>0 && box.h>0){
+        tctx.drawImage(pad, box.x, box.y, box.w, box.h, 0, 0, toSize, toSize);
+      }else{
+        tctx.drawImage(pad, 0, 0, pad.width, pad.height, 0, 0, toSize, toSize);
+      }
+
+      // 2) Get image data and convert to 0-1 grayscale
+      const id = tctx.getImageData(0,0,toSize,toSize); const d=id.data; const invert = document.getElementById('invertChk').checked;
+      const out = new Float32Array(toSize*toSize);
+      for(let i=0,j=0;i<d.length;i+=4,j++){
+        const r=d[i],g=d[i+1],b=d[i+2];
+        let gray = (0.299*r + 0.587*g + 0.114*b)/255; // 0..1
+        gray = invert ? gray : 1-gray; // If not inverting at load time, invert here for black-on-white inputs
+        out[j] = gray;
+      }
+      // 3) Create tensor [1,28,28,1]
+      return tf.tensor(out, [1,toSize,toSize,1]);
+    }
+
+    function boundingBox(data,w,h,margin=6){
+      const threshold = 10; // anything brighter than this considered ink due to dark bg
+      let minX=w, minY=h, maxX=-1, maxY=-1;
+      for(let y=0;y<h;y++){
+        for(let x=0;x<w;x++){
+          const i = (y*w + x)*4;
+          const val = (data[i]+data[i+1]+data[i+2])/3; // 0..255
+          if(val>threshold){
+            if(x<minX)minX=x; if(y<minY)minY=y; if(x>maxX)maxX=x; if(y>maxY)maxY=y;
+          }
+        }
+      }
+      if(maxX<0||maxY<0) return {x:0,y:0,w:0,h:0};
+      minX=Math.max(0,minX-margin); minY=Math.max(0,minY-margin);
+      maxX=Math.min(w-1,maxX+margin); maxY=Math.min(h-1,maxY+margin);
+      return {x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1};
+    }
+
+    function setPrediction(pred){
+      const predEl = document.getElementById('predLabel');
+      const probsEl = document.getElementById('probs');
+      probsEl.innerHTML = '';
+      if(!pred){ predEl.textContent = '–'; return; }
+      predEl.textContent = pred.best.toString();
+      for(let i=0;i<10;i++){
+        const row = document.createElement('div'); row.className='prob';
+        const k = document.createElement('div'); k.textContent = i;
+        const bar = document.createElement('div'); bar.className='bar';
+        const fill = document.createElement('i'); fill.style.right = (100 - Math.round(pred.probs[i]*100))+'%';
+        bar.appendChild(fill);
+        const pct = document.createElement('div'); pct.textContent = (pred.probs[i]*100).toFixed(1)+'%'; pct.style.textAlign='right';
+        row.append(k,bar,pct); probsEl.appendChild(row);
+      }
+    }
+
+    async function predict(){
+      if(!model){ alert('Load a model first.'); return; }
+      const input = preprocess(28);
+      const out = tf.tidy(()=> model.predict(input));
+      const data = await out.data(); out.dispose(); input.dispose();
+      let bestI = 0; for(let i=1;i<data.length;i++){ if(data[i]>data[bestI]) bestI=i; }
+      setPrediction({best:bestI, probs:data});
+    }
+
+    document.getElementById('predictBtn').onclick = predict;
+
+    // ------------------------------
+    // Helpers: keep UI snappy
+    // ------------------------------
+    // Prevent pinch-zoom from scrolling the page while drawing
+    document.addEventListener('gesturestart', e=> e.preventDefault());
+  </script>
+</body>
+</html>
