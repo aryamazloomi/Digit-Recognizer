@@ -144,10 +144,23 @@
 
     async function loadLayers(url){if(typeof tf.loadLayersModel==='function')return tf.loadLayersModel(url);if(tf.io&&typeof tf.io.loadLayersModel==='function')return tf.io.loadLayersModel(url);throw new Error('No loadLayersModel in this TFJS build')}
 
-    async function loadModel(){
-      const url=modelUrlInput.value.trim();
-      try{setBadge('loading','Loading…');await tf.ready();try{model=await loadLayers(url);modelType='layers'}catch(e){model=await tf.loadGraphModel(url);modelType='graph'}if(modelType==='layers'){const s=model.inputs[0].shape;expectedInput=(s.length===2&&s[1]===784)?'flat':'image';tf.tidy(()=>{if(expectedInput==='flat')model.predict(tf.zeros([1,784]));else model.predict(tf.zeros([1,28,28,1]))})}else{expectedInput='image'}runDiagnostics();setBadge('loaded',modelType==='layers'?'Loaded (Layers)':'Loaded (Graph)')}catch(err){setBadge('err','Failed');alert('Failed to load model: '+err.message);runDiagnostics()}}
-
+    async function loadModel() {
+      const url = modelUrlInput.value.trim();
+      try {
+        await tf.ready();
+        try {
+          model = await loadLayers(url);       // layers model
+          modelType = 'layers';
+        } catch (err) {
+          console.error('loadLayersModel failed:', err);
+          alert('loadLayersModel failed: ' + err.message);
+          return;                              // don’t fall back automatically
+        }
+        // (continue with model setup…)
+      } catch (err) {
+        alert('Failed to load model: ' + err.message);
+      }
+    }
     document.getElementById('loadBtn').onclick=loadModel;
 
     function preprocess(n=28){const t=document.createElement('canvas');t.width=n;t.height=n;const tc=t.getContext('2d');const src=ctx.getImageData(0,0,pad.width,pad.height);const b=boundingBox(src.data,pad.width,pad.height,10);tc.fillStyle='#000';tc.fillRect(0,0,n,n);if(b.w>0&&b.h>0){tc.drawImage(pad,b.x,b.y,b.w,b.h,0,0,n,n)}else{tc.drawImage(pad,0,0,pad.width,pad.height,0,0,n,n)}const id=tc.getImageData(0,0,n,n);const d=id.data;const inv=document.getElementById('invertChk').checked;const out=new Float32Array(n*n);for(let i=0,j=0;i<d.length;i+=4,j++){const r=d[i],g=d[i+1],b=d[i+2];let g1=(0.299*r+0.587*g+0.114*b)/255;g1=inv?g1:1-g1;out[j]=g1}return expectedInput==='flat'?tf.tensor(out,[1,n*n]):tf.tensor(out,[1,n,n,1])}
