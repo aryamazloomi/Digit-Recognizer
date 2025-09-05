@@ -1,179 +1,242 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Digit Recognizer • TensorFlow.js</title>
-  <meta name="description" content="Draw or upload a digit and get a prediction from a TensorFlow.js model." />
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-  <style>
-    :root{ --bg:#0b0d10; --panel:#12161b; --muted:#7b8794; --text:#e6edf3; --accent:#6ee7b7; --accent-2:#93c5fd; --danger:#fda4af; --border:rgba(255,255,255,.08) }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0;background:linear-gradient(180deg,#0a0c10 0%,#0b0d10 30%,#101318 100%);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,"Helvetica Neue",Arial}
-    .wrap{max-width:1100px;margin:0 auto;padding:28px}
-    header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
-    .title{display:flex;align-items:center;gap:12px}
-    .title .dot{width:10px;height:10px;border-radius:999px;background:var(--accent);box-shadow:0 0 24px var(--accent)}
-    h1{margin:0;font-size:clamp(20px,2.6vw,28px);letter-spacing:.2px}
-    .card{background:linear-gradient(180deg,#12161b 0%,#0f141a 100%);border:1px solid var(--border);border-radius:18px;box-shadow:0 10px 35px rgba(0,0,0,.35);overflow:hidden}
-    .grid{display:grid;grid-template-columns:380px 1fr;gap:18px}
-    @media (max-width:900px){.grid{grid-template-columns:1fr}}
-    .left{padding:18px}
-    .tools{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 14px}
-    button,.btn{appearance:none;border:1px solid var(--border);background:#141a21;color:var(--text);padding:10px 14px;border-radius:12px;cursor:pointer;transition:.15s transform,.15s background,.15s border-color;font-weight:600}
-    button:hover{transform:translateY(-1px);border-color:#223046}
-    button.primary{background:linear-gradient(180deg,#1b2837,#152030);border-color:#203049}
-    button.primary:hover{border-color:#2a4263}
-    .danger{border-color:rgba(255,255,255,.08);background:linear-gradient(180deg,#2a1116,#1a0b0e)}
-    .muted{color:var(--muted)}
-    .switch{display:flex;align-items:center;gap:8px}
-    .switch input{accent-color:var(--accent)}
-    .note{font-size:13px;color:var(--muted)}
-    .canvas-wrap{position:relative;display:grid;place-items:center;background:#0a0d12;border:1px dashed #223046;border-radius:16px;aspect-ratio:1/1}
-    canvas#pad{background:#0e1319;border-radius:14px;touch-action:none;image-rendering:pixelated}
-    .right{padding:18px;border-left:1px solid var(--border)}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .row input[type="text"]{flex:1;min-width:240px;background:#0f141a;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:12px}
-    .badge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
-    .badge .led{width:8px;height:8px;border-radius:999px;background:#555}
-    .badge.loaded .led{background:var(--accent)}
-    .badge.err .led{background:var(--danger)}
-    .prob{display:grid;grid-template-columns:24px 1fr 56px;gap:10px;align-items:center}
-    .bar{height:12px;background:#131a22;border:1px solid var(--border);border-radius:999px;position:relative;overflow:hidden}
-    .bar>i{position:absolute;inset:0 100% 0 0;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-right:1px solid rgba(255,255,255,.25)}
-    .pred{font-size:40px;font-weight:800;letter-spacing:1px}
-    .drop{border:1px dashed #2a3a53;border-radius:12px;padding:10px;text-align:center;cursor:pointer}
-    .footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
-    a {color:#93c5fd;text-decoration:none}
-    .kbd{background:#121820;border:1px solid var(--border);padding:2px 6px;border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px}
-    .diag{margin-top:10px;border:1px dashed #334158;border-radius:12px;padding:8px 10px;font-size:12px;color:#a9b6c4;background:#0d131a}
-    .diag b{color:#e6edf3}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digit Recognizer</title>
+    <!-- TensorFlow.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #333;
+        }
+        #canvas-container {
+            border: 2px solid #ccc;
+            background-color: white;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        canvas {
+            display: block;
+        }
+        .controls button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        #predictButton {
+            background-color: #4CAF50;
+            color: white;
+        }
+        #predictButton:hover {
+            background-color: #45a049;
+        }
+        #clearButton {
+            background-color: #f44336;
+            color: white;
+        }
+        #clearButton:hover {
+            background-color: #da190b;
+        }
+        #prediction {
+            margin-top: 20px;
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .loading {
+            color: #555;
+            font-size: 1.2em;
+        }
+    </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div class="title">
-        <div class="dot" aria-hidden></div>
-        <h1>Digit Recognizer <span class="muted">(TensorFlow.js)</span></h1>
-      </div>
-      <div class="badge" id="modelBadge" title="Model status"><span class="led"></span> Model: not loaded</div>
-    </header>
+    <h1>Draw a Digit</h1>
+    <p>Draw a single digit (0-9) in the box below, then click "Predict".</p>
 
-    <div class="card grid">
-      <section class="left">
-        <div class="row" style="margin-bottom:8px">
-          <button class="primary" id="predictBtn">Predict (<span class="kbd">P</span>)</button>
-          <button id="clearBtn">Clear (<span class="kbd">C</span>)</button>
-          <label class="switch"><input type="checkbox" id="invertChk" checked>Invert to MNIST-style</label>
-          <label class="switch"><input type="checkbox" id="smoothChk" checked>Smooth stroke</label>
-        </div>
-        <div class="canvas-wrap">
-          <canvas id="pad" width="280" height="280" aria-label="Drawing pad"></canvas>
-        </div>
-        <div class="row" style="margin-top:12px">
-          <div class="drop" id="uploadArea">Drop an image here or <u>click to upload</u></div>
-          <input type="file" id="fileInput" accept="image/png,image/jpeg" hidden>
-        </div>
-        <p class="note">Tip: draw a thick, centered digit in white-on-dark. Toggle “Invert” if needed. </p>
-      </section>
-
-      <section class="right">
-        <div class="row" style="margin-bottom:10px">
-          <input id="modelUrl" type="text" placeholder="Models/model.json" />
-          <button id="loadBtn">Load model</button>
-        </div>
-        <p class="note">Place your exported TF.js model at <code>Models/model.json</code> or paste any HTTPS URL.</p>
-        <div style="margin:14px 0 8px" class="muted">Prediction</div>
-        <div class="pred" id="predLabel">–</div>
-        <div id="probs" style="display:grid;gap:8px;margin-top:12px"></div>
-        <div class="diag" id="diagBox">Diagnostics will appear here.</div>
-        <div class="footer">
-          <div class="note">Preprocess: resize→grayscale→normalize(0–1)→invert (optional)</div>
-          <a href="https://github.com/" target="_blank" rel="noopener">View on GitHub</a>
-        </div>
-      </section>
+    <div id="canvas-container">
+        <canvas id="digitCanvas" width="280" height="280"></canvas>
     </div>
 
-    <p class="note" style="margin-top:14px">Keyboard: <span class="kbd">P</span> predict, <span class="kbd">C</span> clear. Canvas: 280×280 → 28×28. Supports [1,784] and [1,28,28,1].</p>
-  </div>
+    <div class="controls">
+        <button id="predictButton">Predict</button>
+        <button id="clearButton">Clear</button>
+    </div>
 
-  <script>
-    const diag = (msg)=>{ document.getElementById('diagBox').innerHTML = msg };
-    function fmt(v){ return `<b>${v}</b>` }
-    function runDiagnostics(){
-      try{
-        const info = {version:(tf&&tf.version&&tf.version.tfjs)||'n/a',backend:(tf&&tf.getBackend&&tf.getBackend())||'n/a',hasLLM:!!(tf&&typeof tf.loadLayersModel==='function'),hasIOLLM:!!(tf&&tf.io&&typeof tf.io.loadLayersModel==='function'),hasLGM:!!(tf&&typeof tf.loadGraphModel==='function')};
-        diag(`TFJS ${fmt(info.version)} • backend ${fmt(info.backend)}<br>loadLayersModel: ${fmt(info.hasLLM)} • io.loadLayersModel: ${fmt(info.hasIOLLM)} • loadGraphModel: ${fmt(info.hasLGM)}`)
-      }catch(e){diag('Diagnostics error: '+e.message)}
-    }
+    <div id="prediction">
+        Prediction: <span id="predictionResult">_</span>
+    </div>
 
-    const pad=document.getElementById('pad');
-    const ctx=pad.getContext('2d',{willReadFrequently:true});
-    let drawing=false,last=null;let expectedInput='image';
-    function resetPad(){ctx.save();ctx.fillStyle='#0e1319';ctx.fillRect(0,0,pad.width,pad.height);ctx.restore()}
-    resetPad();
-    function setBrush(){const s=document.getElementById('smoothChk').checked;ctx.lineWidth=26;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#ffffff';ctx.filter=s?'blur(0.4px)':'none'}
-    function pos(e){const r=pad.getBoundingClientRect();const x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;const y=(e.touches?e.touches[0].clientY:e.clientY)-r.top;return{x:x*(pad.width/r.width),y:y*(pad.height/r.height)}}
-    function start(e){drawing=true;last=pos(e);setBrush()}
-    function move(e){if(!drawing)return;const p=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p}
-    function end(){drawing=false;last=null}
-    pad.addEventListener('mousedown',start);pad.addEventListener('mousemove',move);window.addEventListener('mouseup',end);
-    pad.addEventListener('touchstart',e=>{e.preventDefault();start(e)},{passive:false});
-    pad.addEventListener('touchmove',e=>{e.preventDefault();move(e)},{passive:false});
-    pad.addEventListener('touchend',e=>{e.preventDefault();end(e)},{passive:false});
-    document.getElementById('clearBtn').onclick=()=>{resetPad();setPrediction(null)};
-    document.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='c')document.getElementById('clearBtn').click();if(e.key.toLowerCase()==='p')document.getElementById('predictBtn').click()});
+    <div class="loading" id="loadingMessage">Loading model...</div>
 
-    const uploadArea=document.getElementById('uploadArea');
-    const fileInput=document.getElementById('fileInput');
-    uploadArea.addEventListener('click',()=>fileInput.click());
-    uploadArea.addEventListener('dragover',e=>{e.preventDefault();uploadArea.style.background='rgba(147,197,253,.06)'});
-    uploadArea.addEventListener('dragleave',()=>{uploadArea.style.background='transparent'});
-    uploadArea.addEventListener('drop',e=>{e.preventDefault();uploadArea.style.background='transparent';handleFiles(e.dataTransfer.files)});
-    fileInput.addEventListener('change',()=>handleFiles(fileInput.files));
-    function handleFiles(files){if(!files||!files[0])return;const f=files[0];const img=new Image();img.onload=()=>{resetPad();const s=Math.min(pad.width/img.width,pad.height/img.height);const w=img.width*s,h=img.height*s;const x=(pad.width-w)/2,y=(pad.height-h)/2;const inv=document.getElementById('invertChk').checked;if(inv){const t=document.createElement('canvas');t.width=w;t.height=h;const tc=t.getContext('2d');tc.drawImage(img,0,0,w,h);const id=tc.getImageData(0,0,w,h);const d=id.data;for(let i=0;i<d.length;i+=4){const r=d[i],g=d[i+1],b=d[i+2];const gray=(r*0.299+g*0.587+b*0.114);const v=255-gray;d[i]=d[i+1]=d[i+2]=v}tc.putImageData(id,0,0);ctx.drawImage(t,x,y)}else{ctx.drawImage(img,x,y,w,h)}};img.src=URL.createObjectURL(f)}
+    <script>
+        const canvas = document.getElementById('digitCanvas');
+        const ctx = canvas.getContext('2d');
+        const predictButton = document.getElementById('predictButton');
+        const clearButton = document.getElementById('clearButton');
+        const predictionResult = document.getElementById('predictionResult');
+        const loadingMessage = document.getElementById('loadingMessage');
 
-    let model=null;let modelType='layers';
-    const modelUrlInput=document.getElementById('modelUrl');
-    modelUrlInput.value='Models/model.json';
-    const modelBadge=document.getElementById('modelBadge');
-    function setBadge(s,t){modelBadge.classList.remove('loaded','err');if(s==='loaded')modelBadge.classList.add('loaded');if(s==='err')modelBadge.classList.add('err');modelBadge.lastChild.textContent=' Model: '+t}
+        let model;
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
 
-    async function loadLayers(url){if(typeof tf.loadLayersModel==='function')return tf.loadLayersModel(url);if(tf.io&&typeof tf.io.loadLayersModel==='function')return tf.io.loadLayersModel(url);throw new Error('No loadLayersModel in this TFJS build')}
+        const CANVAS_SIZE = 280; // Size of the display canvas
+        const MODEL_INPUT_SIZE = 28; // Size required by the model (28x28)
 
-    async function loadModel() {
-      const url = modelUrlInput.value.trim();
-      try {
-        await tf.ready();
-        try {
-          model = await loadLayers(url);       // layers model
-          modelType = 'layers';
-        } catch (err) {
-          console.error('loadLayersModel failed:', err);
-          alert('loadLayersModel failed: ' + err.message);
-          return;                              // don’t fall back automatically
+        // Set up canvas for drawing
+        ctx.lineWidth = 15;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'black';
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE); // Initialize canvas with white background
+
+        // Load the TensorFlow.js model
+        async function loadModel() {
+            try {
+                // Ensure model.json and group1-shard1of1.bin are in the same directory
+                // or provide the correct relative path to model.json
+                model = await tf.loadLayersModel('./model.json');
+                console.log('Model loaded successfully!');
+                loadingMessage.style.display = 'none';
+                predictButton.disabled = false;
+                clearButton.disabled = false;
+            } catch (error) {
+                console.error('Error loading model:', error);
+                loadingMessage.textContent = 'Error loading model. Check console for details.';
+                predictButton.disabled = true;
+                clearButton.disabled = true;
+            }
         }
-        // (continue with model setup…)
-      } catch (err) {
-        alert('Failed to load model: ' + err.message);
-      }
-    }
-    document.getElementById('loadBtn').onclick=loadModel;
 
-    function preprocess(n=28){const t=document.createElement('canvas');t.width=n;t.height=n;const tc=t.getContext('2d');const src=ctx.getImageData(0,0,pad.width,pad.height);const b=boundingBox(src.data,pad.width,pad.height,10);tc.fillStyle='#000';tc.fillRect(0,0,n,n);if(b.w>0&&b.h>0){tc.drawImage(pad,b.x,b.y,b.w,b.h,0,0,n,n)}else{tc.drawImage(pad,0,0,pad.width,pad.height,0,0,n,n)}const id=tc.getImageData(0,0,n,n);const d=id.data;const inv=document.getElementById('invertChk').checked;const out=new Float32Array(n*n);for(let i=0,j=0;i<d.length;i+=4,j++){const r=d[i],g=d[i+1],b=d[i+2];let g1=(0.299*r+0.587*g+0.114*b)/255;g1=inv?g1:1-g1;out[j]=g1}return expectedInput==='flat'?tf.tensor(out,[1,n*n]):tf.tensor(out,[1,n,n,1])}
+        // Drawing functions
+        function drawStart(e) {
+            isDrawing = true;
+            [lastX, lastY] = getCanvasCoordinates(e);
+        }
 
-    function boundingBox(data,w,h,m=6){const th=10;let minX=w,minY=h,maxX=-1,maxY=-1;for(let y=0;y<h;y++){for(let x=0;x<w;x++){const i=(y*w+x)*4;const v=(data[i]+data[i+1]+data[i+2])/3;if(v>th){if(x<minX)minX=x;if(y<minY)minY=y;if(x>maxX)maxX=x;if(y>maxY)maxY=y}}}if(maxX<0||maxY<0)return{x:0,y:0,w:0,h:0};minX=Math.max(0,minX-m);minY=Math.max(0,minY-m);maxX=Math.min(w-1,maxX+m);maxY=Math.min(h-1,maxY+m);return{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}}
+        function drawMove(e) {
+            if (!isDrawing) return;
+            e.preventDefault(); // Prevent scrolling on touch devices
+            let [x, y] = getCanvasCoordinates(e);
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            [lastX, lastY] = [x, y];
+        }
 
-    function setPrediction(p){const predEl=document.getElementById('predLabel');const probsEl=document.getElementById('probs');probsEl.innerHTML='';if(!p){predEl.textContent='–';return}predEl.textContent=p.best.toString();for(let i=0;i<10;i++){const row=document.createElement('div');row.className='prob';const k=document.createElement('div');k.textContent=i;const bar=document.createElement('div');bar.className='bar';const fill=document.createElement('i');fill.style.right=(100-Math.round(p.probs[i]*100))+'%';bar.appendChild(fill);const pct=document.createElement('div');pct.textContent=(p.probs[i]*100).toFixed(1)+'%';pct.style.textAlign='right';row.append(k,bar,pct);probsEl.appendChild(row)}}
+        function drawEnd() {
+            isDrawing = false;
+        }
 
-    async function predict(){if(!model){alert('Load a model first.');return}const input=preprocess(28);let out;if(modelType==='layers'){out=tf.tidy(()=>model.predict(input))}else{const res=await model.executeAsync(input);out=Array.isArray(res)?res[0]:res}const data=await out.data();out.dispose();input.dispose();let bestI=0;for(let i=1;i<data.length;i++){if(data[i]>data[bestI])bestI=i}setPrediction({best:bestI,probs:data})}
+        function getCanvasCoordinates(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            return [clientX - rect.left, clientY - rect.top];
+        }
 
-    document.getElementById('predictBtn').onclick=predict;
-    runDiagnostics();
-    document.addEventListener('gesturestart',e=>e.preventDefault());
-  </script>
+        // Preprocess the image for prediction
+        function preprocessImage(imageData) {
+            return tf.tidy(() => {
+                // Create an off-screen canvas to resize and convert to grayscale
+                const offscreenCanvas = document.createElement('canvas');
+                offscreenCanvas.width = MODEL_INPUT_SIZE;
+                offscreenCanvas.height = MODEL_INPUT_SIZE;
+                const offscreenCtx = offscreenCanvas.getContext('2d');
+
+                // Draw the user's drawing onto the off-screen canvas (scaling it down)
+                offscreenCtx.drawImage(imageData, 0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
+
+                // Get image data from the off-screen canvas
+                const imgData = offscreenCtx.getImageData(0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
+                let tensor = tf.browser.fromPixels(imgData, 1); // Get grayscale (1 channel)
+                
+                // Invert colors and normalize to [0, 1] for MNIST (black background, white digit)
+                // If your model expects white background, black digit, remove the 1.0 - tensor part.
+                tensor = tf.cast(tensor, 'float32').div(255.0);
+                tensor = tf.sub(1.0, tensor); // Invert colors (MNIST digits are white on black background)
+
+                // Reshape to [1, 784] for your model's input
+                return tensor.reshape([1, MODEL_INPUT_SIZE * MODEL_INPUT_SIZE]);
+            });
+        }
+
+        // Predict function
+        async function predictDigit() {
+            if (!model) {
+                predictionResult.textContent = 'Model not loaded yet.';
+                return;
+            }
+
+            // Get the image data from the main canvas
+            const imageData = ctx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+            const processedTensor = preprocessImage(imageData);
+
+            // Make prediction
+            const prediction = model.predict(processedTensor);
+            const probabilities = prediction.dataSync(); // Get the raw probabilities
+            const predictedClass = prediction.argMax(-1).dataSync()[0]; // Get the index of the highest probability
+
+            predictionResult.textContent = predictedClass;
+            
+            // Log probabilities for debugging (optional)
+            console.log('Probabilities:', probabilities);
+            console.log('Predicted class:', predictedClass);
+
+            // Clean up tensors
+            processedTensor.dispose();
+            prediction.dispose();
+        }
+
+        // Clear canvas function
+        function clearCanvas() {
+            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE); // Reset to white background
+            predictionResult.textContent = '_';
+        }
+
+        // Event Listeners
+        canvas.addEventListener('mousedown', drawStart);
+        canvas.addEventListener('mousemove', drawMove);
+        canvas.addEventListener('mouseup', drawEnd);
+        canvas.addEventListener('mouseout', drawEnd); // Stop drawing if mouse leaves canvas
+
+        // For touch devices
+        canvas.addEventListener('touchstart', drawStart);
+        canvas.addEventListener('touchmove', drawMove);
+        canvas.addEventListener('touchend', drawEnd);
+        canvas.addEventListener('touchcancel', drawEnd);
+
+        predictButton.addEventListener('click', predictDigit);
+        clearButton.addEventListener('click', clearCanvas);
+
+        // Disable buttons until model is loaded
+        predictButton.disabled = true;
+        clearButton.disabled = true;
+
+        // Initial model load
+        loadModel();
+    </script>
 </body>
 </html>
